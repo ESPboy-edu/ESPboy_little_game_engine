@@ -18,8 +18,7 @@
 //  #include "lib/ESPboyOTA2.cpp"
     ESPboyInit myESPboy;
     keyboardModule *keybModule=NULL;
-//    ESPboyTerminalGUI *terminalGUIobj = NULL;
-//    ESPboyOTA2 *OTA2obj = NULL;
+  
 #else
   #include <TFT_eSPI.h>
   #include <SPI.h>
@@ -192,12 +191,7 @@ void setup() {
  #ifdef ESPBOY
   Serial.println(); Serial.println(F("ESPboy"));
   myESPboy.begin("Little game engine");
- /*
-  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
-     terminalGUIobj = new ESPboyTerminalGUI(&myESPboy.tft, &myESPboy.mcp);
-     OTA2obj = new ESPboyOTA2(terminalGUIobj);
-  }
-  */
+
   myESPboy.tft.fillScreen(0x0000);
   keybModule = new keyboardModule(1,1,7000);  
   if (keybModule->begin()) Serial.println(F("\nESPboy keyboard module found"));
@@ -244,9 +238,6 @@ void setup() {
       delay(2000);
     }
   }
-
-  // ОПТИМИЗАЦИЯ: Распаковка работает только после того, как FS реально запущена
-  extractProgmemGamesToFS();
   
   memoryAlloc();
   loadSplashscreen();
