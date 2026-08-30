@@ -382,40 +382,36 @@ void fileList(String path) {
   bool redraw_menu = true; 
   
   while(1){
-    clearScr(0);
-    skip = startpos - 1;
-    if(skip < 0)
-      skip = 0;
-    lst = 1;
-    dir = LittleFS.openDir(path);
-    setColor(8);
-    for(i = 1; i < 17; i++)
-      drwLine(2, (pos - startpos) * 17 + i, 124,  (pos - startpos) * 17 + i);
-    setColor(1);
-    while (dir.next() && lst < 8) {
-      fs::File entry = dir.openFile("r");
-      if(skip > 0){
-        skip--;
-      }
-      else{
-        strcpy(s, entry.name());
-        if(lst + startpos - 1 == pos)
-          strcpy(thisF, entry.name());
-        putString(s, lst * 17 - 16);
-        i = 0;
-        while(i < 28 && s[i] != '.')
-          i++;
-        i++;
-        if(s[i] == 'l' && s[i + 1] == 'g' && s[i + 2] == 'e'){
-          entry.seek(3, SeekSet);
-          if(entry.available())
-            b = (uint8_t)entry.read();
-          if(b & 0x2){
-            entry.seek(5, SeekSet);
-            for(i = 0; i < 192; i++)
-              if(entry.available())
-                writeMem(i + 1024, (uint8_t)entry.read());
-            drawImg(1024, 0, lst * 17 - 16, 24, 16);
+    if (redraw_menu) {
+        clearScr(0);
+        int16_t skip = startpos;
+        lst = 1; dir = LittleFS.openDir(path);
+        setColor(8);
+        for(i = 1; i < 17; i++) drwLine(2, (pos - startpos) * 17 + i, 124,  (pos - startpos) * 17 + i);
+        setColor(1);
+        
+        while (dir.next() && lst < 8) {
+          String fn = dir.fileName();
+          if (!fn.endsWith(".lge") && !fn.endsWith(".bin")) continue;
+
+          if(skip > 0){ skip--; }
+          else {
+            fs::File entry = dir.openFile("r");
+            strcpy(s, entry.name());
+            if(lst + startpos - 1 == pos) strcpy(thisF, entry.name());
+            putString(s, lst * 17 - 16);
+            i = 0; while(i < 28 && s[i] != '.') i++; i++;
+            if(s[i] == 'l' && s[i + 1] == 'g' && s[i + 2] == 'e'){
+              entry.seek(3, SeekSet);
+              if(entry.available()) b = (uint8_t)entry.read();
+              if(b & 0x2){
+                entry.seek(5, SeekSet);
+                for(i = 0; i < 192; i++) if(entry.available()) writeMem(i + 1024, (uint8_t)entry.read());
+                drawImg(1024, 0, lst * 17 - 16, 24, 16);
+              } else drawImg(1024 + 192, 0, lst * 17 - 16, 24, 16);
+            } else if(s[i] == 'b' && s[i + 1] == 'i' && s[i + 2] == 'n') drawImg(1024 + 192, 0, lst * 17 - 16, 24, 16);
+            lst++;
+            entry.close();
           }
         }
         redrawScreen(); drawVersionInFileList();
@@ -432,10 +428,8 @@ void fileList(String path) {
       cpuInit();
       i = 0; while(i < 28 && thisF[i] != '.') i++; i++;
       setLoadedFileName(thisF);
-      if(thisF[i] == 'b' && thisF[i + 1] == 'i' && thisF[i + 2] == 'n')
-        loadBinFromSPIFS(thisF);
-      else if(thisF[i] == 'l' && thisF[i + 1] == 'g' && thisF[i + 2] == 'e')
-        loadLgeFromSPIFS(thisF);
+      if(thisF[i] == 'b' && thisF[i + 1] == 'i' && thisF[i + 2] == 'n') loadBinFromSPIFS(thisF);
+      else if(thisF[i] == 'l' && thisF[i + 1] == 'g' && thisF[i + 2] == 'e') loadLgeFromSPIFS(thisF);
       return;
     } else if(thiskey & 2){ 
       if(pos < fileCount - 1) pos++; else { pos = 0; startpos = 0; }
@@ -492,86 +486,62 @@ void loadLgeFromSPIFS(char fileName[]){
   f.close();
 }
 
-
 #define INIT_MARKER_ADDR (EEPROM_SIZE - 2)
-const uint16_t INIT_MARKER_VALUE = 0xABCD; // Строго 2 байта!
+const uint16_t INIT_MARKER_VALUE = 0xABCD;
 
 void extractProgmemGamesToFS() {
   uint16_t currentMarker = 0;
-  EEPROM.get(INIT_MARKER_ADDR, currentMarker); // Читаем 2 байта по адресу в переменную
+  EEPROM.get(INIT_MARKER_ADDR, currentMarker);
   
-  if (currentMarker == INIT_MARKER_VALUE) {
-    return; // Игры уже распакованы
-  }
+  if (currentMarker == INIT_MARKER_VALUE) return;
 
   Serial.println(F("Extracting games..."));
 
-  // Макрос для поддержки и ESPboy, и обычных экранов
   #ifdef ESPBOY
     auto& disp = myESPboy.tft;
   #else
     auto& disp = tft;
   #endif
 
-  // Отрисовываем базовый интерфейс загрузки
   disp.fillScreen(0x0000);
   disp.setTextColor(0xFFFF);
   disp.setCursor(14, 30);
   disp.print(F("Unpacking games..."));
-  
-  // Рамка прогресс-бара
   disp.drawRect(13, 59, 102, 12, 0xFFFF);
 
-  // Считаем общий объем данных для вычисления процентов
   long totalBytes = 0;
-  for (int i = 0; i < BUILTIN_GAMES_COUNT; i++) {
-     totalBytes += builtinGames[i].size;
-  }
+  for (int i = 0; i < BUILTIN_GAMES_COUNT; i++) totalBytes += builtinGames[i].size;
 
-  long copiedBytes = 0;
-  int lastPercent = -1;
+  long copiedBytes = 0; int lastPercent = -1;
 
   for (int i = 0; i < BUILTIN_GAMES_COUNT; i++) {
      String fname = "/" + String(builtinGames[i].filename);
-     
      if (!LittleFS.exists(fname)) {
         File f = LittleFS.open(fname, "w");
         if (f) {
            size_t left = builtinGames[i].size;
            const uint8_t* ptr = builtinGames[i].data;
-           
            while(left > 0) {
               size_t toWrite = (left > 256) ? 256 : left;
               uint8_t buf[256];
               memcpy_P(buf, ptr, toWrite);
               f.write(buf, toWrite);
+              ptr += toWrite; left -= toWrite; copiedBytes += toWrite;
               
-              ptr += toWrite;
-              left -= toWrite;
-              copiedBytes += toWrite;
-              
-              // Вычисляем процент и обновляем экран только при его изменении
               int percent = (copiedBytes * 100) / totalBytes;
               if (percent != lastPercent) {
-                // Заполняем прогресс-бар
-                disp.fillRect(14, 60, percent, 10, 0x07E0); // Зеленая полоса
-                
-                // Обновляем текст процентов
-                disp.fillRect(50, 80, 40, 16, 0x0000); // Стираем старые цифры
-                disp.setCursor(55, 80);
-                disp.print(percent);
-                disp.print(F("%"));
-                
+                disp.fillRect(14, 60, percent, 10, 0x07E0);
+                disp.fillRect(50, 80, 40, 16, 0x0000);
+                disp.setCursor(55, 80); disp.print(percent); disp.print(F("%"));
                 lastPercent = percent;
               }
-              yield(); // Кормим Watchdog
+              yield(); 
            }
            f.close();
         }
      }
   }
   
-  // Сохраняем 2-байтовый маркер распаковки
   EEPROM.put(INIT_MARKER_ADDR, INIT_MARKER_VALUE);
   EEPROM.commit();
   Serial.println(F("Extraction complete."));
