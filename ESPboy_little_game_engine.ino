@@ -12,8 +12,15 @@
   #include "lib/ESPboyInit.cpp"
   #include "lib/ESPboy_keyboard.h"
   #include "lib/ESPboy_keyboard.cpp"
+//  #include "lib/ESPboyTerminalGUI.h"
+//  #include "lib/ESPboyTerminalGUI.cpp"
+//  #include "lib/ESPboyOTA2.h"
+//  #include "lib/ESPboyOTA2.cpp"
     ESPboyInit myESPboy;
     keyboardModule *keybModule=NULL;
+//    ESPboyTerminalGUI *terminalGUIobj = NULL;
+//    ESPboyOTA2 *OTA2obj = NULL;
+    
   
 #else
   #include <TFT_eSPI.h>
@@ -270,7 +277,13 @@ void setup() {
   
   //Init ESPboy
   myESPboy.begin("Little game engine");
-
+/*
+    //Check OTA2
+  if (myESPboy.getKeys()&PAD_ACT || myESPboy.getKeys()&PAD_ESC) { 
+     terminalGUIobj = new ESPboyTerminalGUI(&myESPboy.tft, &myESPboy.mcp);
+     OTA2obj = new ESPboyOTA2(terminalGUIobj);
+  }
+*/
   myESPboy.tft.fillScreen(0x0000);
 
   keybModule = new keyboardModule(1,1,7000);  
@@ -337,6 +350,8 @@ void setup() {
       delay(2000);
     }
   }
+
+  extractProgmemGamesToFS();
   
   // turn off ESP8266 RF
   //WiFiOff();

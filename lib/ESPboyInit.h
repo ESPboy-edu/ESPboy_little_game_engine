@@ -23,10 +23,10 @@ using fs::FS;
 
 #define MCP23017address 0 // actually it's 0x20 but in <Adafruit_MCP23017.h> lib there is (x|0x20) :)
 #define MCP4725address  0x60
+#define CSTFTPIN 		8  //Chip Select pin for LCD (it's on the MCP23017 GPIO expander GPIO8)
 
 #define LEDPIN         D4
 #define SOUNDPIN       D3
-#define CSTFTPIN       8 //Chip Select pin for LCD (it's on the MCP23017 GPIO expander GPIO8)
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02

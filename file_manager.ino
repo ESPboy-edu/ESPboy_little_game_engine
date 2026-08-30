@@ -1,16 +1,4 @@
-//#include "LGEgames/romBlackJack.h"
-//#include "LGEgames/romCapMan.h"
-#include "LGEgames/romFisherMan.h"
-//#include "LGEgames/romFishLife.h"
-//#include "LGEgames/romFlatRace.h"
-//#include "LGEgames/romFourInaRow.h"
-//#include "LGEgames/romMicroRace.h"
-//#include "LGEgames/romPlagueOutbreak.h"
-//#include "LGEgames/romSpaceFighter.h"
-//#include "LGEgames/romSpaceInvaders.h"
-//#include "LGEgames/romTankCity.h"
-//#include "LGEgames/romTowerDefence.h"
-//#include "LGEgames/rom1916.h"
+#include "lgegameslist.h"
 
 const uint8_t saveIco[] PROGMEM = {
 0x66, 0x66, 0x66, 0x66, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf6, 0x00, 0x00, 0x00, 0x00, 
@@ -525,12 +513,6 @@ void fileList(String path) {
     for(i = 1; i < 17; i++)
       drwLine(2, (pos - startpos) * 17 + i, 124,  (pos - startpos) * 17 + i);
     setColor(1);
-    if(startpos == 0){
-        putString(ROM_NAME, lst * 17 - 16);
-        loadRomIco();
-        drawImg(1024, 0, lst * 17 - 16, 24, 16);
-        lst++;
-    }
     while (dir.next() && lst < 8) {
       fs::File entry = dir.openFile("r");
       if(skip > 0){
@@ -596,9 +578,7 @@ void fileList(String path) {
         i++;
       i++;
       setLoadedFileName(thisF);
-      if(startpos == pos && pos == 0)
-        loadRom();
-      else if(thisF[i] == 'b' && thisF[i + 1] == 'i' && thisF[i + 2] == 'n')
+      if(thisF[i] == 'b' && thisF[i + 1] == 'i' && thisF[i + 2] == 'n')
         loadBinFromSPIFS(thisF);
       else if(thisF[i] == 'l' && thisF[i + 1] == 'g' && thisF[i + 2] == 'e')
         loadLgeFromSPIFS(thisF);
@@ -717,4 +697,89 @@ void loadLgeFromSPIFS(char fileName[]){
   Serial.print(F("free heap "));
   Serial.println(system_get_free_heap_size());
   f.close();  //Close file
+}
+
+
+#define INIT_MARKER_ADDR (EEPROM_SIZE - 2)
+const uint16_t INIT_MARKER_VALUE = 0xABCD; // Строго 2 байта!
+
+void extractProgmemGamesToFS() {
+  uint16_t currentMarker = 0;
+  EEPROM.get(INIT_MARKER_ADDR, currentMarker); // Читаем 2 байта по адресу в переменную
+  
+  if (currentMarker == INIT_MARKER_VALUE) {
+    return; // Игры уже распакованы
+  }
+
+  Serial.println(F("Extracting games..."));
+
+  // Макрос для поддержки и ESPboy, и обычных экранов
+  #ifdef ESPBOY
+    auto& disp = myESPboy.tft;
+  #else
+    auto& disp = tft;
+  #endif
+
+  // Отрисовываем базовый интерфейс загрузки
+  disp.fillScreen(0x0000);
+  disp.setTextColor(0xFFFF);
+  disp.setCursor(14, 30);
+  disp.print(F("Unpacking games..."));
+  
+  // Рамка прогресс-бара
+  disp.drawRect(13, 59, 102, 12, 0xFFFF);
+
+  // Считаем общий объем данных для вычисления процентов
+  long totalBytes = 0;
+  for (int i = 0; i < BUILTIN_GAMES_COUNT; i++) {
+     totalBytes += builtinGames[i].size;
+  }
+
+  long copiedBytes = 0;
+  int lastPercent = -1;
+
+  for (int i = 0; i < BUILTIN_GAMES_COUNT; i++) {
+     String fname = "/" + String(builtinGames[i].filename);
+     
+     if (!LittleFS.exists(fname)) {
+        File f = LittleFS.open(fname, "w");
+        if (f) {
+           size_t left = builtinGames[i].size;
+           const uint8_t* ptr = builtinGames[i].data;
+           
+           while(left > 0) {
+              size_t toWrite = (left > 256) ? 256 : left;
+              uint8_t buf[256];
+              memcpy_P(buf, ptr, toWrite);
+              f.write(buf, toWrite);
+              
+              ptr += toWrite;
+              left -= toWrite;
+              copiedBytes += toWrite;
+              
+              // Вычисляем процент и обновляем экран только при его изменении
+              int percent = (copiedBytes * 100) / totalBytes;
+              if (percent != lastPercent) {
+                // Заполняем прогресс-бар
+                disp.fillRect(14, 60, percent, 10, 0x07E0); // Зеленая полоса
+                
+                // Обновляем текст процентов
+                disp.fillRect(50, 80, 40, 16, 0x0000); // Стираем старые цифры
+                disp.setCursor(55, 80);
+                disp.print(percent);
+                disp.print(F("%"));
+                
+                lastPercent = percent;
+              }
+              yield(); // Кормим Watchdog
+           }
+           f.close();
+        }
+     }
+  }
+  
+  // Сохраняем 2-байтовый маркер распаковки
+  EEPROM.put(INIT_MARKER_ADDR, INIT_MARKER_VALUE);
+  EEPROM.commit();
+  Serial.println(F("Extraction complete."));
 }
