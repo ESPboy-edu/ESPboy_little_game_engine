@@ -9,24 +9,24 @@ v1.0
 #define ESPboy_Init
 
 #include <Arduino.h>
-#include <Adafruit_MCP23017.h> //to control buttons
-#include <Adafruit_MCP4725.h>  //to control the LCD display backlit
+#include "ESPboyMCP.h"
+#include "ESPboyMCP.cpp"
 #include "ESPboyLED.h"
 #include "ESPboyLED.cpp"
 #include "ESPboylogo.h"
 
-#include <TFT_eSPI.h>          //to draw at LCD TFT
+#include <TFT_eSPI.h> 
+
 #include <ESP8266WiFi.h>       //to control WiFi
 
 #include <FS.h> 
 using fs::FS;
 
-#define MCP23017address 0 // actually it's 0x20 but in <Adafruit_MCP23017.h> lib there is (x|0x20) :)
 #define MCP4725address  0x60
+#define CSTFTPIN 		8  //Chip Select pin for LCD (it's on the MCP23017 GPIO expander GPIO8)
 
 #define LEDPIN         D4
 #define SOUNDPIN       D3
-#define CSTFTPIN       8 //Chip Select pin for LCD (it's on the MCP23017 GPIO expander GPIO8)
 
 #define PAD_LEFT        0x01
 #define PAD_UP          0x02
@@ -42,10 +42,10 @@ using fs::FS;
 class ESPboyInit{
 
 public:
-  Adafruit_MCP23017 mcp;
-  Adafruit_MCP4725 dac;
+  ESPboyMCP mcp;
   TFT_eSPI tft;
   ESPboyLED myLED;
+
 
   ESPboyInit();
   void begin(const char *appName);

@@ -125,12 +125,3 @@ void loadSplashscreen(){
     writeMem(i, pgm_read_byte(&splashscreen[i]));
 }
 
-void loadRom(){
-  for(int i = 0; i < sizeof(rom); i++)
-    writeMem(i, pgm_read_byte(&rom[i]));
-}
-
-void loadRomIco(){
-  for(int i = 0; i < sizeof(romImage); i++)
-    writeMem(i + 1024, pgm_read_byte(&romImage[i]));
-}
